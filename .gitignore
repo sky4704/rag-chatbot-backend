@@ -1,0 +1,50 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+venv/
+ENV/
+ragenv/
+
+# Environment variables
+.env
+
+# Project specific
+db/*.db
+db/0cf99f55-1295-45d4-99ba-0aadf14f060a/
+db/23418dec-d140-4cf1-872e-82da16832a4f/
+db/3048e29d-dfeb-4024-8afe-ab6b8aef48a2/
+db/3f6ccc3f-c662-44f8-910b-3859b08d3599/
+db/41b49c6a-c019-4693-96c6-2fb3064be34f/
+db/d5804184-5ca0-4657-9002-606cfd541b42/
+db/d90d0935-73c2-435e-aa97-579b308ec26f/
+db/e26d2672-16b9-453f-9945-db61893f917e/
+db/e61d3585-5cc2-43b7-aa5b-a6d812446dae/
+db/chroma.sqlite3
+data/*.pdf
+static/covers/*
+!static/covers/.gitkeep
