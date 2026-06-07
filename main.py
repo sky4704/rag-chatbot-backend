@@ -27,17 +27,25 @@ async def lifespan(app: FastAPI):
     # Initialize DB on start
     init_db()
     
-    # Auto-create admin if environment variables are set and no user exists
+    # Auto-create or Update admin from environment variables
     admin_user = os.getenv("ADMIN_USERNAME")
     admin_pass = os.getenv("ADMIN_PASSWORD")
     if admin_user and admin_pass:
         db = next(get_db())
-        if db.query(User).count() == 0:
+        from utils.auth import get_password_hash
+        
+        user = db.query(User).filter(User.username == admin_user).first()
+        if not user:
             print(f"Creating default admin: {admin_user}")
-            from utils.auth import get_password_hash
             hashed_password = get_password_hash(admin_pass)
             new_user = User(username=admin_user, hashed_password=hashed_password)
             db.add(new_user)
+            db.commit()
+        else:
+            # If the user exists, update their password to match ADMIN_PASSWORD
+            # This acts as a reset if you forget your password
+            print(f"Syncing password for admin: {admin_user}")
+            user.hashed_password = get_password_hash(admin_pass)
             db.commit()
         db.close()
     yield
