@@ -3,7 +3,11 @@ from dotenv import load_dotenv
 from langchain_google_genai import GoogleGenerativeAIEmbeddings, ChatGoogleGenerativeAI
 from langchain_groq import ChatGroq
 import google.generativeai as genai
-from typing import List
+from typing import List, Any, Optional
+from langchain_core.language_models.chat_models import BaseChatModel
+from langchain_core.messages import BaseMessage
+from langchain_core.outputs import ChatResult
+from langchain_core.runnables import RunnableLambda
 
 load_dotenv()
 
@@ -36,17 +40,42 @@ def get_embeddings():
     return CustomGoogleEmbeddings(model="models/gemini-embedding-001")
 
 def get_llm():
-    """Initializes and returns the Gemini Pro chat model with Groq fallback."""
-    # Use the model confirmed to work in diagnostics
-    gemini = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0.3)
+    """Initializes and returns the Gemini Pro chat model with Groq fallback and signatures."""
+    # 1. Primary Model: Gemini
+    gemini = ChatGoogleGenerativeAI(
+        model="gemini-2.5-flash", 
+        temperature=0.3,
+        max_retries=1
+    )
     
-    # Fallback to Groq if Gemini hits rate limits and API key is provided
+    # 2. Fallback Model: Groq
     groq_api_key = os.getenv("GROQ_API_KEY")
-    if groq_api_key:
-        groq = ChatGroq(model="llama3-70b-8192", temperature=0.3)
-        return gemini.with_fallbacks([groq])
     
-    return gemini
+    # Signatures
+    def add_gemini_signature(res):
+        if hasattr(res, 'content'):
+            res.content += "\n\n✨ *Answered by Neural Gateway (Gemini)*"
+        return res
+
+    def add_groq_signature(res):
+        if hasattr(res, 'content'):
+            res.content += "\n\n🚀 *Answered by Deep Memory (Groq/Llama)*"
+        return res
+
+    # Create tagged chains
+    gemini_tagged = gemini | RunnableLambda(add_gemini_signature)
+    
+    if groq_api_key:
+        print("LOG: Groq fallback with signature enabled.")
+        groq = ChatGroq(model="llama-3.3-70b-versatile", temperature=0.3)
+        groq_tagged = groq | RunnableLambda(add_groq_signature)
+        
+        return gemini_tagged.with_fallbacks(
+            fallbacks=[groq_tagged],
+            exceptions_to_handle=(Exception,)
+        )
+    
+    return gemini_tagged
 
 def get_vector_store(collection_name: str):
     """
