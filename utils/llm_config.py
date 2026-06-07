@@ -11,7 +11,7 @@ def get_embeddings():
 
 def get_llm():
     """Initializes and returns the Gemini Pro chat model with Groq fallback."""
-    gemini = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0.3)
+    gemini = ChatGoogleGenerativeAI(model="gemini-3-flash-preview", temperature=0.3)
     
     # Fallback to Groq if Gemini hits rate limits and API key is provided
     groq_api_key = os.getenv("GROQ_API_KEY")
