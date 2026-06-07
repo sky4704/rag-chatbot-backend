@@ -25,29 +25,33 @@ from contextlib import asynccontextmanager
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Initialize DB on start
+    print("LOG: Starting application lifespan. Initializing DB...")
     init_db()
     
     # Auto-create or Update admin from environment variables
     admin_user = os.getenv("ADMIN_USERNAME")
     admin_pass = os.getenv("ADMIN_PASSWORD")
+    
     if admin_user and admin_pass:
-        db = next(get_db())
-        from utils.auth import get_password_hash
-        
-        user = db.query(User).filter(User.username == admin_user).first()
-        if not user:
-            print(f"Creating default admin: {admin_user}")
-            hashed_password = get_password_hash(admin_pass)
-            new_user = User(username=admin_user, hashed_password=hashed_password)
-            db.add(new_user)
-            db.commit()
-        else:
-            # If the user exists, update their password to match ADMIN_PASSWORD
-            # This acts as a reset if you forget your password
-            print(f"Syncing password for admin: {admin_user}")
-            user.hashed_password = get_password_hash(admin_pass)
-            db.commit()
-        db.close()
+        print(f"LOG: Attempting to sync admin user: {admin_user}")
+        from utils.db import SessionLocal
+        with SessionLocal() as db:
+            from utils.auth import get_password_hash
+            user = db.query(User).filter(User.username == admin_user).first()
+            if not user:
+                print(f"LOG: Creating new default admin: {admin_user}")
+                hashed_password = get_password_hash(admin_pass)
+                new_user = User(username=admin_user, hashed_password=hashed_password)
+                db.add(new_user)
+                db.commit()
+                print("LOG: Admin created successfully.")
+            else:
+                print(f"LOG: Syncing password for existing admin: {admin_user}")
+                user.hashed_password = get_password_hash(admin_pass)
+                db.commit()
+                print("LOG: Password synced successfully.")
+    else:
+        print("LOG: ADMIN_USERNAME or ADMIN_PASSWORD not set in environment.")
     yield
 
 app = FastAPI(title="Multi-Book RAG API", lifespan=lifespan)
@@ -55,7 +59,7 @@ app = FastAPI(title="Multi-Book RAG API", lifespan=lifespan)
 # Enable CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In production, specify your frontend URL
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -75,26 +79,19 @@ for path in [DATA_DIR, DB_DIR, COVERS_DIR]:
 # Serve static files
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
-@app.post("/init-admin")
-async def init_admin(username: str = Form(...), password: str = Form(...), db: Session = Depends(get_db)):
-    # Check if any user exists
-    existing_users = db.query(User).count()
-    if existing_users > 0:
-        raise HTTPException(status_code=403, detail="Initialization already complete. Admin exists.")
-    
-    from utils.auth import get_password_hash
-    hashed_password = get_password_hash(password)
-    new_user = User(username=username, hashed_password=hashed_password)
-    db.add(new_user)
-    db.commit()
-    return {"message": f"Superuser '{username}' created successfully."}
-
 @app.post("/login")
 async def login(username: str = Form(...), password: str = Form(...), db: Session = Depends(get_db)):
+    print(f"LOG: Login attempt for user: {username}")
     user = db.query(User).filter(User.username == username).first()
-    if not user or not verify_password(password, user.hashed_password):
+    if not user:
+        print(f"LOG: Login failed. User {username} not found in database.")
         raise HTTPException(status_code=401, detail="Incorrect username or password")
     
+    if not verify_password(password, user.hashed_password):
+        print(f"LOG: Login failed. Password mismatch for user: {username}")
+        raise HTTPException(status_code=401, detail="Incorrect username or password")
+    
+    print(f"LOG: Login successful for user: {username}")
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
         data={"sub": username}, expires_delta=access_token_expires
