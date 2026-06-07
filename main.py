@@ -26,6 +26,20 @@ from contextlib import asynccontextmanager
 async def lifespan(app: FastAPI):
     # Initialize DB on start
     init_db()
+    
+    # Auto-create admin if environment variables are set and no user exists
+    admin_user = os.getenv("ADMIN_USERNAME")
+    admin_pass = os.getenv("ADMIN_PASSWORD")
+    if admin_user and admin_pass:
+        db = next(get_db())
+        if db.query(User).count() == 0:
+            print(f"Creating default admin: {admin_user}")
+            from utils.auth import get_password_hash
+            hashed_password = get_password_hash(admin_pass)
+            new_user = User(username=admin_user, hashed_password=hashed_password)
+            db.add(new_user)
+            db.commit()
+        db.close()
     yield
 
 app = FastAPI(title="Multi-Book RAG API", lifespan=lifespan)
@@ -52,6 +66,20 @@ for path in [DATA_DIR, DB_DIR, COVERS_DIR]:
 
 # Serve static files
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+
+@app.post("/init-admin")
+async def init_admin(username: str = Form(...), password: str = Form(...), db: Session = Depends(get_db)):
+    # Check if any user exists
+    existing_users = db.query(User).count()
+    if existing_users > 0:
+        raise HTTPException(status_code=403, detail="Initialization already complete. Admin exists.")
+    
+    from utils.auth import get_password_hash
+    hashed_password = get_password_hash(password)
+    new_user = User(username=username, hashed_password=hashed_password)
+    db.add(new_user)
+    db.commit()
+    return {"message": f"Superuser '{username}' created successfully."}
 
 @app.post("/login")
 async def login(username: str = Form(...), password: str = Form(...), db: Session = Depends(get_db)):
