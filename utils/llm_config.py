@@ -54,12 +54,12 @@ def get_llm():
     # Signatures
     def add_gemini_signature(res):
         if hasattr(res, 'content'):
-            res.content += "\n\n✨ *Answered by Neural Gateway (Gemini)*"
+            res.content += "\n\n✨ *(Gemini)*"
         return res
 
     def add_groq_signature(res):
         if hasattr(res, 'content'):
-            res.content += "\n\n🚀 *Answered by Deep Memory (Groq/Llama)*"
+            res.content += "\n\n🚀 *(Groq/Llama)*"
         return res
 
     # Create tagged chains
