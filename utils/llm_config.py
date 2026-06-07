@@ -2,16 +2,43 @@ import os
 from dotenv import load_dotenv
 from langchain_google_genai import GoogleGenerativeAIEmbeddings, ChatGoogleGenerativeAI
 from langchain_groq import ChatGroq
+import google.generativeai as genai
+from typing import List
 
 load_dotenv()
 
+class CustomGoogleEmbeddings(GoogleGenerativeAIEmbeddings):
+    def embed_documents(self, texts: List[str]) -> List[List[float]]:
+        """Embed search docs."""
+        genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
+        return [
+            genai.embed_content(
+                model=self.model,
+                content=text,
+                task_type="retrieval_document",
+                output_dimensionality=768
+            )["embedding"]
+            for text in texts
+        ]
+
+    def embed_query(self, text: str) -> List[float]:
+        """Embed query text."""
+        genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
+        return genai.embed_content(
+            model=self.model,
+            content=text,
+            task_type="retrieval_query",
+            output_dimensionality=768
+        )["embedding"]
+
 def get_embeddings():
-    """Initializes and returns Google Gemini embeddings."""
-    return GoogleGenerativeAIEmbeddings(model="models/gemini-embedding-001")
+    """Initializes and returns Google Gemini embeddings with forced 768 dimensions."""
+    return CustomGoogleEmbeddings(model="models/gemini-embedding-001")
 
 def get_llm():
     """Initializes and returns the Gemini Pro chat model with Groq fallback."""
-    gemini = ChatGoogleGenerativeAI(model="gemini-3-flash-preview", temperature=0.3)
+    # Use the model confirmed to work in diagnostics
+    gemini = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0.3)
     
     # Fallback to Groq if Gemini hits rate limits and API key is provided
     groq_api_key = os.getenv("GROQ_API_KEY")
@@ -31,8 +58,6 @@ def get_vector_store(collection_name: str):
     
     if pinecone_api_key:
         from langchain_pinecone import PineconeVectorStore
-        # Note: In Pinecone, we use the collection_name as a namespace or index name
-        # For simplicity in free tier (1 index limit), we'll use one index and namespaces
         index_name = os.getenv("PINECONE_INDEX", "rag-index")
         return PineconeVectorStore(
             index_name=index_name,

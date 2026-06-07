@@ -200,15 +200,17 @@ async def upload_book(
         
         # Professional Error Parsing
         error_msg = str(e)
-        if "API_KEY_INVALID" in error_msg or "400" in error_msg:
+        if "API_KEY_INVALID" in error_msg:
             friendly_msg = "The system's Access Key is invalid or expired. Please contact the administrator to update the neural gateway credentials."
+        elif "dimension" in error_msg.lower() or "400" in error_msg:
+            friendly_msg = f"Neural Archive Mismatch: The vector dimension or configuration is incorrect. Details: {error_msg[:100]}"
         elif "429" in error_msg:
             friendly_msg = "The archives are currently receiving too many inquiries. Please wait a few moments before trying again."
         elif "tesseract" in error_msg.lower() or "poppler" in error_msg.lower():
             friendly_msg = "The Archive's scanning engine (Tesseract/Poppler) is not correctly configured on the host system."
         else:
-            friendly_msg = f"Archive Ingestion Failed: {error_msg[:100]}..."
-            
+            friendly_msg = f"Archive Ingestion Failed: {error_msg[:150]}"
+
         raise HTTPException(status_code=500, detail=friendly_msg)
 
 @app.patch("/books/{book_id}")
